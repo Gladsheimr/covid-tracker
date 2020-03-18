@@ -4,15 +4,33 @@ import * as FileSystem from 'expo-file-system';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, ButtonGroup, Icon, ListItem } from 'react-native-elements';
 
+interface CurrentAudio {
+  empty: boolean,
+  idx?: string | number,
+  info?: any,
+  base64?: string
+}
+
+interface SampleListItem {
+  name?: string,
+  label?: string,
+  info?: any,
+  idx?: string
+}
+
+interface SampleListMap {
+  [key: string]: SampleListItem,
+
+}
 
 export default function App() {
 
   const [isRecording, setRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState(0);
-  const [label, setLabel] = useState("UNKNOWN");
-  const [currentAudio, setCurrentAudio] = useState({empty:true});
-  const [list , setList]= useState({})
-  const [isProcessing, setProcessing]= useState(false);
+  const [label, setLabel] = useState(null as string);
+  const [currentAudio, setCurrentAudio] = useState({ empty: true, } as CurrentAudio);
+  const [list, setList] = useState({} as any)
+  const [isProcessing, setProcessing] = useState(false);
 
   const labels = ["Cough", "Unknown"];
 
@@ -30,44 +48,58 @@ export default function App() {
 
   const record = async () => {
     const recording = new Audio.Recording();
-    setCurrentAudio({empty: true});
+    setCurrentAudio({ empty: true });
     try {
       try {
-      const prepared = await recording.prepareToRecordAsync({
-        android: {
-          extension: '.m4a',
-          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
-          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 1000,
-        },
-        ios: {
-          ...Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY.ios,
-          extension: '.wav',
-          outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_LINEARPCM,
-          sampleRate: 16000,
-          bitRateStrategy:
-            Audio.RECORDING_OPTION_IOS_BIT_RATE_STRATEGY_CONSTANT,
-        },
-      });
-    } catch(ERR) {
-      console.error(ERR)
-    }
+        const prepared = await recording.prepareToRecordAsync({
+          android: {
+            extension: '.m4a',
+            outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
+            audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+            sampleRate: 16000,
+            numberOfChannels: 1,
+            bitRate: 1000,
+          },
+          ios: {
+            ...Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY.ios,
+            extension: '.wav',
+            outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_LINEARPCM,
+            sampleRate: 16000,
+            bitRateStrategy:
+              Audio.RECORDING_OPTION_IOS_BIT_RATE_STRATEGY_CONSTANT,
+          },
+        });
+      } catch (ERR) {
+        console.error(ERR)
+      }
 
 
       await recording.startAsync();
+      const keyLength = Object.keys(list).length
+      const newListItem = {
+        "idx": keyLength,
+        "name": `Sample ${keyLength}`,
+        "info": currentAudio,
+        "label": "Unlabled",
+        "status": "Recording"
+      }
+      const newList = list;
+      newList[keyLength] = newListItem
+      setList(newList);
 
       recording.setOnRecordingStatusUpdate(async (status) => {
+
         if (status.durationMillis >= (10000) && !status.isDoneRecording) {
           recording.stopAndUnloadAsync();
+
+
           const info = await FileSystem.getInfoAsync(recording.getURI());
-          console.log(info)
           setProcessing(true);
           const base64Data = await FileSystem.readAsStringAsync(recording.getURI(), { encoding: "base64" });
-          setCurrentAudio({...info, base64Data: base64Data, empty:false});
-          setProcessing(false)
+          setCurrentAudio({ ...info, base64: base64Data, empty: false, idx: keyLength });
+          setProcessing(false);
           setRecordedTime(0);
+
         } else {
 
           setRecordedTime(status.durationMillis / 1000);
@@ -89,54 +121,54 @@ export default function App() {
   }
 
 
-  const handleLabels = (labelIdx) => { 
+  const handleLabels = (labelIdx, key) => {
+    console.log("IDX IS ", labelIdx, labels[labelIdx])
     const newLabel = labels[labelIdx]
-
     setLabel(newLabel);
+    const newList = list;
 
-    const keyLength = Object.keys(list).length
-    list[keyLength] = { 
-           "name": `${label} Sample ${keyLength}`, 
-           "label": newLabel, 
-           "info": currentAudio
-         }
-    setList(list);
-  
+    newList[key].label = newLabel;
+
+
+    setList(newList)
+
   }
   const micIcon = <Icon name="ios-mic" type="ionicon" color="white" size={75} />
+  const micOffIcon = <Icon name="ios-mic-off" type="ionicon" color="grey" size={75} />
 
   return (
     <>
-    <View style={styles.container}>
-      <View style={styles.recorderView}>
-        <Button buttonStyle={{ width: 100, height: 100, alignSelf: "center", borderRadius: 50 }} onPress={() => record()} icon={micIcon} />
+      <View style={styles.container}>
+        <View style={styles.recorderView}>
+          <Button buttonStyle={{ width: 100, height: 100, alignSelf: "center", borderRadius: 50 }} onPress={() => record()} icon={isRecording ? micOffIcon : micIcon} disabled={isRecording} />
 
-        <View style={styles.recordingStatusView}>
-            <Text>{!isRecording ? "Record a sample" : `Recording ${recordedTime} secs`}</Text>
+          <View style={styles.recordingStatusView}>
+            <Text>{!currentAudio.empty ? "Record a sample" : `Recording ${recordedTime} secs`}</Text>
           </View>
 
-        <View style={styles.recorderView}>
-          {!currentAudio.empty &&
-            <ButtonGroup onPress={(idx) => handleLabels(idx)} disabled={isRecording} selectedIndex={label === "Cough" ? 0 : 1} buttons={labels} />
+          <View style={styles.recorderView}>
+            
+          </View>
+        </View>
+
+        <View style={styles.listView}>
+          {/* <Text>{JSON.stringify(Object.keys(list))}</Text> */}
+          {
+            Object.keys(list).map((key) => {
+              const l: SampleListItem = list[key];
+              return <ListItem
+                //roundAvatar
+                //avatar={{uri:l.avatar_url}}
+                key={l.idx}
+                title={l.name}
+                subtitle={l.label}
+                buttonGroup={{onPress:(idx) => handleLabels(idx, key),  buttons: labels,}}
+              />
+            })
           }
         </View>
-      </View>
-      
 
-    </View>
-    <View style={styles.listView}>
-    {
-      Object.keys(list).map((key) => {
-        const l = list[key];
-        <ListItem
-          //roundAvatar
-          //avatar={{uri:l.avatar_url}}
-          key={l.name}
-          title={l.name}
-        />
-      })
-    }
-  </View></>
+      </View></>
   );
 }
 
@@ -152,8 +184,6 @@ const styles = StyleSheet.create({
   recorderView: {
     padding: 50,
     paddingTop: 100,
-    flex: 1,
-    flexDirection: 'column',
     alignItems: 'center',
   },
   recorderButtonView: {
@@ -165,6 +195,7 @@ const styles = StyleSheet.create({
   listView: {
     flex: 4,
     marginBottom: 5,
+    width: 400
 
   }
 });
