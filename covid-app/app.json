@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Blank Template (TypeScript)",
+    "name": "Covid Cough Detector",
     "slug": "covid-app",
     "privacy": "public",
     "sdkVersion": "36.0.0",
