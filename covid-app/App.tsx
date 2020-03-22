@@ -31,6 +31,7 @@ export default function App() {
   const [currentAudio, setCurrentAudio] = useState({ empty: true, } as CurrentAudio);
   const [list, setList] = useState({} as any)
   const [isProcessing, setProcessing] = useState(false);
+  const [isPlaying, setPlaying] = useState(false);
 
   const labels = ["Cough", "Unknown"];
 
@@ -80,7 +81,7 @@ export default function App() {
         "idx": keyLength,
         "name": `Sample ${keyLength}`,
         "info": currentAudio,
-        "label": "Unlabled",
+        "label": "N/A",
         "status": "Recording"
       }
       const newList = list;
@@ -99,6 +100,10 @@ export default function App() {
           setCurrentAudio({ ...info, base64: base64Data, empty: false, idx: keyLength });
           setProcessing(false);
           setRecordedTime(0);
+
+          const newList = list;
+          newList[keyLength].info = info
+          setList(newList);
 
         } else {
 
@@ -120,9 +125,45 @@ export default function App() {
 
   }
 
+  const playAudio = async (info?: FileSystem.FileInfo) => {
+    console.log("IS PLAYING" + info.uri)
+    if (info.exists) {
+      const playbackObject = await Audio.Sound.createAsync(
+        { uri: info.uri },
+        { shouldPlay: true }
+      );
+      await playbackObject.sound.setVolumeAsync(0.8);
+
+      playbackObject.sound.setOnPlaybackStatusUpdate(async (status) => {
+        console.log(status);
+        if (status.isLoaded) {
+          
+          //setPlaying(true)
+          if (!status.isPlaying) {
+            await playbackObject.sound.playAsync();
+          }
+          
+          setPlaying(status.isPlaying)
+
+          if (status.didJustFinish) { 
+
+              await playbackObject.sound.unloadAsync();
+
+          } else {
+            
+          }
+        } 
+      })
+
+
+
+     
+
+    }
+  }
+
 
   const handleLabels = (labelIdx, key) => {
-    console.log("IDX IS ", labelIdx, labels[labelIdx])
     const newLabel = labels[labelIdx]
     setLabel(newLabel);
     const newList = list;
@@ -162,7 +203,9 @@ export default function App() {
                 key={l.idx}
                 title={l.name}
                 subtitle={l.label}
+                onPress={() => playAudio(l.info)}
                 buttonGroup={{onPress:(idx) => handleLabels(idx, key),  buttons: labels,}}
+                disabled={isPlaying}
               />
             })
           }
